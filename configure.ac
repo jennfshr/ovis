@@ -47,6 +47,8 @@ AC_ARG_VAR([BISON], [bison command])
 AC_CHECK_PROG([BISON], [bison -y], [bison -y], [no])
 AS_IF([test "x$BISON" = "xno"], [AC_MSG_ERROR([bison not found])])
 
+AC_PROG_YACC
+
 dnl Checks for programs
 AC_PROG_CXX
 dnl Checks for typedefs, structures, and compiler characteristics.

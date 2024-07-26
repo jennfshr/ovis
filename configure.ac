@@ -734,7 +734,7 @@ if test -z "$ENABLE_SOS_TRUE"; then
 		CFLAGS=$OCFLAGS
 		LIBS=""
 	else
-		AC_MSG_NOTICE([Using staged ovis-sos $OPVIS_SOS_LIB64DIR_FLAG $OVIS_SOS_LIBDIR_FLAG])
+		AC_MSG_NOTICE([Using staged ovis-sos $OVIS_SOS_LIB64DIR_FLAG $OVIS_SOS_LIBDIR_FLAG])
 	fi
 fi
 

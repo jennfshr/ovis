@@ -902,6 +902,51 @@ int ldms_xprt_sockaddr(ldms_t x, struct sockaddr *local_sa,
 		       struct sockaddr *remote_sa,
 		       socklen_t *sa_len);
 
+/* currently only support IPv4 and IPv6 */
+struct ldms_addr {
+	sa_family_t sa_family; /* host-endian */
+	in_port_t   sin_port;  /* network-endian */
+	uint8_t     addr[16];  /* addr[0-3] for IPv4,
+				  addr[0-15] for IPv6 */
+};
+
+/**
+ * \brief Get local and remote address in \c ldms_addr struct from the xprt
+ *
+ * \param x   LDMS Transport pointer
+ * \param local_addr  Local address (re-entrant)
+ * \param remote_addr Remote address (re-entrant)
+ *
+ * \return 0 on success.
+ */
+int ldms_xprt_addr(ldms_t x, struct ldms_addr *local_addr,
+			    struct ldms_addr *remote_addr);
+
+const char *ldms_sockaddr_ntop(struct sockaddr *sa, char *buff, size_t sz);
+
+/**
+ * \brief Convert a CIDR IP address string to \c ldms_addr
+ *
+ * The address is stored in \c addr, and the prefix length is stored in \c prefix_len.
+ *
+ * \param addr   ldms_addr pointer
+ * \param prefix_len   Integer pointer
+ *
+ * \retval 0 if success. Otherwise, an errno is returned.
+ */
+int ldms_cidr2addr(const char *cdir_str, struct ldms_addr *addr, int *prefix_len);
+
+/**
+ * \brief Verify if \c sa is in \net_addr with the prefix \c prefix_len
+ *
+ * \param ip_addr    IP Address
+ * \param net_addr   Network Address
+ * \param prefix_len Prefix length for masking
+ *
+ * \return 1 if the IP address is in the network address. Otherwise, 0 is returned.
+ */
+int ldms_addr_in_network_addr(struct ldms_addr *ip_addr,
+				struct ldms_addr *net_addr, int prefix_len);
 /**
  * \brief Close a connection to an LDMS host.
  *
@@ -983,6 +1028,26 @@ int ldms_xprt_is_remote_rail(ldms_t x);
  * \retval -EINVAL If \c x is not a rail.
  */
 int ldms_xprt_rail_eps(ldms_t x);
+
+/**
+ * \brief Get the receive limit of an endpoint
+ *
+ * \param x The transport handle
+ *
+ * \retval Receive limit is retunred.
+ * \retval -EINVAL if \c x is NULL or not a rail
+ */
+int64_t ldms_xprt_recv_limit(ldms_t x);
+
+/**
+ * \brief Get the receive rate limit of an endpoint
+ *
+ * \param x The transport handle
+ *
+ * \retval Receive limit is retunred.
+ * \retval -EINVAL if \c x is NULL or not a rail
+ */
+int64_t ldms_xprt_recv_rate_limit(ldms_t x);
 
 /**
  * \brief Get the send credit
@@ -1104,18 +1169,13 @@ int ldms_stream_publish_file(ldms_t x, const char *stream_name,
 typedef struct ldms_stream_client_s *ldms_stream_client_t;
 typedef struct json_entity_s *json_entity_t;
 
-/* currently only support IPv4 and IPv6 */
-struct ldms_addr {
-	sa_family_t sa_family; /* host-endian */
-	in_port_t   sin_port;  /* network-endian */
-	uint8_t     addr[16];  /* addr[0-3] for IPv4,
-				  addr[0-15] for IPv6 */
-};
-
 enum ldms_stream_event_type {
 	LDMS_STREAM_EVENT_RECV, /* stream data received */
 	LDMS_STREAM_EVENT_SUBSCRIBE_STATUS, /* reporting subscription status */
 	LDMS_STREAM_EVENT_UNSUBSCRIBE_STATUS, /* reporting unsubscription status */
+	LDMS_STREAM_EVENT_CLOSE, /* reporting stream client close event.
+				  * This is the last event to deliver from a
+				  * client. */
 };
 
 /* For stream data delivery to the application */
@@ -1140,12 +1200,18 @@ struct ldms_stream_return_status_s {
 	int status;
 };
 
+/* For stream close event */
+struct ldms_stream_close_event_s {
+	ldms_stream_client_t client;
+};
+
 typedef struct ldms_stream_event_s {
 	ldms_t r; /* rail */
 	enum ldms_stream_event_type type;
 	union {
 		struct ldms_stream_recv_data_s recv;
 		struct ldms_stream_return_status_s status;
+		struct ldms_stream_close_event_s close;
 	};
 } *ldms_stream_event_t;
 
@@ -2827,6 +2893,7 @@ extern int ldms_schema_metric_add_with_unit(ldms_schema_t s, const char *name,
 extern int ldms_schema_meta_add_with_unit(ldms_schema_t s, const char *name,
 					  const char *unit, enum ldms_value_type t);
 
+size_t ldms_metric_value_size_get(enum ldms_value_type t, uint32_t count);
 
 /**
  * \brief Return the heap bytes required
@@ -3526,6 +3593,7 @@ enum ldms_value_type ldms_record_metric_type_get(ldms_mval_t rec,
  */
 void ldms_record_metric_set(ldms_mval_t rec_inst, int metric_id,
 			    ldms_mval_t val);
+
 
 /**
  * Set value to elements in the array metric in the record instance.

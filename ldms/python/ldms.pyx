@@ -3209,7 +3209,7 @@ cdef class Xprt(object):
         import types
         cdef int rc
         cdef timespec ts
-        if not isinstance(cb, types.FunctionType) and cb is not None:
+        if cb is not None and not callable(cb):
             raise TypeError("Callback argument must be callable")
         self._conn_cb = cb
         self._conn_cb_arg = cb_arg
@@ -3785,7 +3785,7 @@ cdef class LdmsAddr(object):
             raise RuntimeError(f"Unsupported address family: {sa.sa_family}")
 
     def as_tuple(self):
-        return tuple( self.family, self.port, self.addr )
+        return ( self.family, self.port, self.addr )
 
     def __iter__(self):
         yield self.family
@@ -3875,7 +3875,12 @@ cdef class StreamData(object):
 
 cdef int __stream_client_cb(ldms_stream_event_t ev, void *arg) with gil:
     cdef StreamClient c = <StreamClient>arg
-    cdef StreamData sdata = StreamData.from_ldms_stream_event(PTR(ev))
+    cdef StreamData sdata
+
+    if ev.type != LDMS_STREAM_EVENT_RECV:
+        return 0
+
+    sdata = StreamData.from_ldms_stream_event(PTR(ev))
     if c.cb:
         c.cb(c, sdata, c.cb_arg)
     else:
